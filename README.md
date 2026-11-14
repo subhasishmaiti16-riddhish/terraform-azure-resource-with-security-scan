@@ -1,5 +1,10 @@
 Azure Infrastructure Automation | Terraform + Azure DevOps | Parallel DevSecOps Scanning (TFLint + TFSec + Checkov)
 
+
+<img width="953" height="773" alt="Screenshot 2026-11-09 020648" src="https://github.com/user-attachments/assets/a3d4f813-d334-4dc5-b8ca-8bff9b1f495e" />
+
+
+
 🚀 Project Overview
 Implemented an automated Azure IaC pipeline using **Terraform and Azure DevOps**, integrating parallel security scanning, infrastructure validation, Terraform Plan, Pull Request approval, and automated deployment.
 Follows **Trunk-Based Development** for secure and controlled infrastructure delivery.
