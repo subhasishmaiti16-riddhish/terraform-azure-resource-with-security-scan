@@ -1,0 +1,157 @@
+pool: mama
+
+trigger:
+- main
+- feature/*
+
+stages:
+
+- stage: TFLint
+  displayName: Terraform Linting
+
+  jobs:
+  - job: TFLint
+    displayName: Run TFLint
+    dependsOn: []
+    steps:
+    - checkout: self
+
+    - task: CmdLine@2
+      displayName: Check TFLint Version
+      inputs:
+        script: |
+          tflint --version
+
+    - task: CmdLine@2
+      displayName: Initialize TFLint
+      inputs:
+        workingDirectory: '$(System.DefaultWorkingDirectory)/parent'
+        script: |
+          tflint --init
+
+    - task: CmdLine@2
+      displayName: Run TFLint
+      inputs:
+        workingDirectory: '$(System.DefaultWorkingDirectory)/parent'
+        script: |
+          tflint --recursive
+
+
+- stage: TFSec
+  displayName: Terraform Security Scan
+  dependsOn: []
+  jobs:
+  - job: TFSec
+    displayName: Run TFSec
+
+    steps:
+    - checkout: self
+
+    
+    - task: CmdLine@2
+      displayName: Run TFSec Scan
+      inputs:
+        workingDirectory: '$(System.DefaultWorkingDirectory)/parent'
+        script: |
+          tfsec .
+
+
+
+- stage: Checkov
+  displayName: Terraform Security Compliance
+  dependsOn: []
+
+  jobs:
+  - job: Checkov
+    displayName: Run Checkov
+    steps:
+    - checkout: self
+
+    - task: CmdLine@2
+      displayName: Install Checkov
+      inputs:
+        script: |
+          python -m pip install checkov
+
+    - task: CmdLine@2
+      displayName: Checkov Scan
+      inputs:
+        script: |
+          checkov -d . --framework terraform
+
+
+
+- stage: terraformInitAndPlan
+  dependsOn:
+  - TFLint
+  - TFSec
+  - Checkov
+
+  displayName: Terraform Init And Plan
+  jobs:
+  - job: terraformInitAndPlan
+    steps:
+    - task: TerraformTask@5
+      displayName: Terraform Init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/parent'
+        backendServiceArm: 'mama-baba-service'
+        backendAzureRmResourceGroupName: 'rg_provider'
+        backendAzureRmStorageAccountName: 'datablockstorage2'
+        backendAzureRmContainerName: 'datablockcont'
+        backendAzureRmKey: 'terraform.datablockcont'
+
+    - task: TerraformTask@5
+      displayName: Terraform Validate
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/parent'
+
+    - task: TerraformTask@5
+      displayName: Terraform Fmt
+      inputs:
+        provider: 'azurerm'
+        command: 'custom'
+        customCommand: 'fmt'
+        commandOptions: '-check -recursive'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/parent'
+        outputTo: 'console'
+        environmentServiceNameAzureRM: 'mama-baba-service'
+
+    - task: TerraformTask@5
+      displayName: Terraform Plan
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/parent'
+        environmentServiceNameAzureRM: 'mama-baba-service'
+
+- stage: terrafotmApply
+  displayName: Terraform Apply
+  dependsOn: terraformInitAndPlan
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+  - job: terrafotmApply
+    steps:
+    - task: TerraformTask@5
+      displayName: Terraform Init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/parent'
+        backendServiceArm: 'mama-baba-service'
+        backendAzureRmResourceGroupName: 'rg_provider'
+        backendAzureRmStorageAccountName: 'datablockstorage2'
+        backendAzureRmContainerName: 'datablockcont'
+        backendAzureRmKey: 'terraform.datablockcont'
+
+    - task: TerraformTask@5
+      displayName: Terraform Apply
+      inputs:
+        provider: 'azurerm'
+        command: 'apply'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/parent'
+        environmentServiceNameAzureRM: 'mama-baba-service'
